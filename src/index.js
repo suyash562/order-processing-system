@@ -7,18 +7,18 @@ const app = express();
 app.use(express.json())
 
 const orderEvent = new EventEmitter();
-// const pool = await poolPromise;
 
 orderEvent.on('orderPrepared',async (orderId)=>{
-        try{
-            const record = await pool.request()
-                .input('orderId', sql.Int, orderId)
-                .input('orderProcessed', sql.Bit, true)
-                .query('update onlineOrders set orderProcessed = @orderProcessed where orderId = @orderId;')
-            }
-        catch(error){
-            console.log(error);
+    try{
+        const pool = await poolPromise;
+        const record = await pool.request()
+            .input('orderId', sql.Int, orderId)
+            .input('orderProcessed', sql.Bit, true)
+            .query('update onlineOrders set orderProcessed = @orderProcessed where orderId = @orderId;')
         }
+    catch(error){
+        console.log(error);
+    }
 })
 
 
