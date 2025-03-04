@@ -6,14 +6,19 @@ const PORT = 3000;
 const app = express();
 app.use(express.json())
 
-let processedOrders = [];
-let processingOrders = [];
-
 const orderEvent = new EventEmitter();
+// const pool = await poolPromise;
 
-orderEvent.on('orderPrepared', (orderId)=>{
-    processedOrders.push(orderId);
-    processingOrders.pop(orderId);
+orderEvent.on('orderPrepared',async (orderId)=>{
+        try{
+            const record = await pool.request()
+                .input('orderId', sql.Int, orderId)
+                .input('orderProcessed', sql.Bit, true)
+                .query('update onlineOrders set orderProcessed = @orderProcessed where orderId = @orderId;')
+            }
+        catch(error){
+            console.log(error);
+        }
 })
 
 
@@ -21,13 +26,13 @@ app.post("/order", async (req, res) => {
     const {order} = req.body;
     
     if(order){
-        if(isOrderProcessed(order.orderId)){
+        if(await isOrderProcessed(order.orderId)){
             return res.status(200).send(`Order with id ${order.orderId} has been processed`);
         }
         else{
-            processingOrders.push(order.orderId);
             const orderStatus = await prepareOrder(order);
             if(orderStatus){
+                orderEvent.emit('orderPrepared', order.orderId);
                 return res.status(200).send(`Order ${order.orderId} has been processed`);
             }
         }
@@ -43,7 +48,7 @@ app.get('/order/:id', async (req, res) => {
         if(await isOrderProcessed(id)){
             return res.status(200).send(`Order with id ${id} has been processed`);
         }
-        else if(isOrderBeingProcessed(id)){
+        else if(await isOrderBeingProcessed(id)){
             return res.status(200).send(`Order with id ${id} is still being processed`);
         }
         else{
@@ -104,7 +109,7 @@ async function isOrderBeingProcessed(id){
         const record = await pool.request()
                 .input('id', sql.Int, id)
                 .query('select * from onlineOrders where orderId = @id;')
-        
+                
         if(record.rowsAffected[0] == 0){
             return false;
         }
